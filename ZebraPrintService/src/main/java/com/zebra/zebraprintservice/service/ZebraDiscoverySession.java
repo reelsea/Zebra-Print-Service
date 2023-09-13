@@ -47,12 +47,12 @@ public class ZebraDiscoverySession extends PrinterDiscoverySession
         for (PrinterInfo printer : mCurrentList)
         {
             if (DEBUG) Log.d(TAG, "------------------------------------------");
-            if (DEBUG) Log.d(TAG, "Printers ID:" + printer.getId());
+            if (DEBUG) Log.d(TAG, "Printers ID:" + printer.getId().getLocalId());
             boolean bFound = false;
             for (PrinterDatabase.Printer stored : printers)
             {
                 if (DEBUG) Log.d(TAG, "Stored ID:" + stored.mPrinterId);
-                if (stored.mPrinterId.equals(printer.getId()))
+                if (stored.mPrinterId.equals(printer.getId().getLocalId()))
                 {
                     bFound = true;
                     if (DEBUG) Log.d(TAG, "Found ID:" + stored.mPrinterId);
