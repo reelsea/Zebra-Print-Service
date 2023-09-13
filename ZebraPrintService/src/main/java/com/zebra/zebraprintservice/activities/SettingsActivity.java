@@ -18,6 +18,9 @@ import android.view.View;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.zebra.criticalpermissionshelper.CriticalPermissionsHelper;
+import com.zebra.criticalpermissionshelper.EPermissionType;
+import com.zebra.criticalpermissionshelper.IResultCallbacks;
 import com.zebra.zebraprintservice.database.PrinterDatabase;
 import com.zebra.zebraprintservice.R;
 import com.zebra.zebraprintservice.service.ZebraPrintService;
@@ -60,6 +63,7 @@ public class SettingsActivity extends Activity
     protected void onCreate(Bundle savedInstanceState)
     {
         super.onCreate(savedInstanceState);
+
         mDb = new PrinterDatabase(this);
 
         //Import Data if we need too.
@@ -158,6 +162,35 @@ public class SettingsActivity extends Activity
     protected void onResume()
     {
         super.onResume();
+        String deviceManufacturer = android.os.Build.MANUFACTURER;
+        if(deviceManufacturer.contains("Zebra")||deviceManufacturer.contains("ZEBRA")) {
+            CriticalPermissionsHelper.grantPermission(this, EPermissionType.ALL_DANGEROUS_PERMISSIONS, new IResultCallbacks() {
+                @Override
+                public void onSuccess(String message, String resultXML) {
+                    Log.d("CriticPermHelp", EPermissionType.ALL_DANGEROUS_PERMISSIONS.toString() + " granted with success.");
+                    checkAndroidPermissions();
+                }
+
+                @Override
+                public void onError(String message, String resultXML) {
+                    Log.d("CriticPermHelp", "Error granting " + EPermissionType.ALL_DANGEROUS_PERMISSIONS.toString() + " permission.\n" + message);
+                    checkAndroidPermissions();
+                }
+
+                @Override
+                public void onDebugStatus(String message) {
+                    Log.d("CriticPermHelp", "Debug Grant Permission " + EPermissionType.ALL_DANGEROUS_PERMISSIONS.toString() + ": " + message);
+                }
+            });
+        }
+        else
+        {
+            Log.d("CriticPermHelp", "Not a Zebra Device");
+            checkAndroidPermissions();
+        }
+    }
+
+    private void checkAndroidPermissions() {
         if(checkPermissions())
         {
             mPermissionTxt.setText(getString(R.string.granted));

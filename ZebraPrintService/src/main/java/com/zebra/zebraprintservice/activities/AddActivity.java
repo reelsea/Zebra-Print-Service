@@ -34,6 +34,9 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 
+import com.zebra.criticalpermissionshelper.CriticalPermissionsHelper;
+import com.zebra.criticalpermissionshelper.EPermissionType;
+import com.zebra.criticalpermissionshelper.IResultCallbacks;
 import com.zebra.zebraprintservice.BuildConfig;
 import com.zebra.zebraprintservice.NetworkDevice;
 import com.zebra.zebraprintservice.PrinterAdapter;
@@ -118,6 +121,7 @@ public class AddActivity extends Activity
     protected void onCreate(Bundle savedInstanceState)
     {
         super.onCreate(savedInstanceState);
+
         setContentView(R.layout.activity_add);
         overridePendingTransition(0,0);
         ActionBar actionBar = getActionBar();
@@ -146,7 +150,32 @@ public class AddActivity extends Activity
         //Register Network Receiver
         registerReceiver(mNetReceiver,new IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION));
 
-        checkPermissions();
+        String deviceManufacturer = android.os.Build.MANUFACTURER;
+        if(deviceManufacturer.contains("Zebra")||deviceManufacturer.contains("ZEBRA")) {
+            CriticalPermissionsHelper.grantPermission(this, EPermissionType.ALL_DANGEROUS_PERMISSIONS, new IResultCallbacks() {
+            @Override
+            public void onSuccess(String message, String resultXML) {
+                Log.d("CriticPermHelp", EPermissionType.ALL_DANGEROUS_PERMISSIONS.toString() + " granted with success.");
+                checkPermissions();
+            }
+
+            @Override
+            public void onError(String message, String resultXML) {
+                Log.d("CriticPermHelp", "Error granting " + EPermissionType.ALL_DANGEROUS_PERMISSIONS.toString() + " permission.\n" + message);
+                checkPermissions();
+            }
+
+            @Override
+            public void onDebugStatus(String message) {
+                Log.d("CriticPermHelp", "Debug Grant Permission " + EPermissionType.ALL_DANGEROUS_PERMISSIONS.toString() + ": " + message);
+            }
+            });
+        }
+        else
+        {
+            Log.d("CriticPermHelp", "Not a Zebra Device");
+            checkPermissions();
+        }
     }
 
     /***********************************************************************************************/
@@ -397,7 +426,7 @@ public class AddActivity extends Activity
                         printer.mAddress = device.getDeviceName();
                         printer.mType = "usb";
                         printer.mDPI = 203;
-                        printer.mPrinterId = "usb:"+device.getDeviceName();
+                        printer.mPrinterId = device.getDeviceName();
                         printer.mDescription = getString(R.string.usb);
                         if (alreadySelected(printer)) return;
                         mPrinterAdapter.add(printer);
@@ -438,7 +467,7 @@ public class AddActivity extends Activity
         {
             BluetoothClass mBtClass = device.getBluetoothClass();
             if (DEBUG) Log.i(TAG, "Bonded : " + device.getAddress() + " COD: " + mBtClass.getDeviceClass() + " -> " + device.getName());
-            if (!DEBUG)
+            //if (!DEBUG)
             {
                 if (mBtClass.getMajorDeviceClass() != BluetoothClass.Device.Major.IMAGING) continue;
                 if (mBtClass.getDeviceClass() != 1664) continue;
@@ -450,7 +479,7 @@ public class AddActivity extends Activity
             printer.mPrinter = device.getName();
             printer.mAddress = device.getAddress();
             printer.mType = "bt";
-            printer.mPrinterId = "bt:"+device.getAddress();
+            printer.mPrinterId = device.getAddress();
             printer.mDescription = device.getAddress() + " - "+ getString(R.string.bluetooth);
             if (alreadySelected(printer)) continue;
             boolean bAdd = true;
@@ -491,7 +520,7 @@ public class AddActivity extends Activity
                 printer.mPrinter = device.getName();
                 printer.mAddress = device.getAddress();
                 printer.mType = "bt";
-                printer.mPrinterId = "bt:"+device.getAddress();
+                printer.mPrinterId = device.getAddress();
                 printer.mDescription = device.getAddress() + " - "+ getString(R.string.bluetooth);
                 if (alreadySelected(printer)) return;
 
@@ -608,7 +637,7 @@ public class AddActivity extends Activity
                             printer.mAddress = netDevice.getAddress();
                             printer.mPort = netDevice.getPort();
                             printer.mType = "network";
-                            printer.mPrinterId = "tcp:"+netDevice.getAddress();
+                            printer.mPrinterId = netDevice.getAddress();
                             printer.mDescription = netDevice.getAddress() + " - " + getString(R.string.network);
                             runOnUiThread(new Runnable()
                                 {

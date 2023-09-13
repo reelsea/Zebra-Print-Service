@@ -112,13 +112,13 @@ public class ManagedConfigurationHelper {
                     switch(dbPrinter.mType)
                     {
                         case "network":
-                            dbPrinter.mPrinterId = "tcp:" + dbPrinter.mAddress;
+                            dbPrinter.mPrinterId = dbPrinter.mAddress;
                             break;
                         case "bt":
-                            dbPrinter.mPrinterId = "bt:" + dbPrinter.mAddress;
+                            dbPrinter.mPrinterId = dbPrinter.mAddress;
                             break;
                         case "usb":
-                            dbPrinter.mPrinterId = "usb:" + dbPrinter.mName;
+                            dbPrinter.mPrinterId = dbPrinter.mName;
                             break;
                     }
                     dbPrinter.mPrinter = dbPrinter.mName;
