@@ -17,6 +17,7 @@
     <string name="no_response">No response from printer</string>
     <string name="settings_title">Service Information</string>
     <string name="granted">Permission Granted</string>
+    <string name="add_printers">Add Printers</string>
     <string name="import_printers">Import Printers</string>
     <string name="export_printers">Export Printers</string>
     <string name="add_printer">Add Printer</string>

@@ -4,6 +4,7 @@ import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.ActionBar;
 import android.app.Activity;
+import android.app.PendingIntent;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothClass;
 import android.bluetooth.BluetoothDevice;
@@ -21,7 +22,6 @@ import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
-import android.printservice.PrintService;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -37,6 +37,9 @@ import androidx.appcompat.app.AlertDialog;
 import com.zebra.criticalpermissionshelper.CriticalPermissionsHelper;
 import com.zebra.criticalpermissionshelper.EPermissionType;
 import com.zebra.criticalpermissionshelper.IResultCallbacks;
+import com.zebra.usbpopupremovalhelper.EDeviceClass;
+import com.zebra.usbpopupremovalhelper.PackageManagementHelper;
+import com.zebra.usbpopupremovalhelper.UsbPopupRemovalHelper;
 import com.zebra.zebraprintservice.BuildConfig;
 import com.zebra.zebraprintservice.NetworkDevice;
 import com.zebra.zebraprintservice.PrinterAdapter;
@@ -62,6 +65,7 @@ public class AddActivity extends Activity
 {
     private static final String TAG = AddActivity.class.getSimpleName();
     private static final boolean DEBUG = BuildConfig.DEBUG & true;
+
     private static final String MULTICAST_ADDRESS = "224.0.1.55";
     private static final int MULTICAST_PORT = 4201;
     private static final int MULTICAST_RECV = 65534;
@@ -87,6 +91,7 @@ public class AddActivity extends Activity
     private PrinterAdapter mPrinterAdapter;
     private Context mCtx;
 
+    private UsbReceiver mUsbPermissionReceiver;
 
     /***********************************************************************************************/
     /** Permissions management                                                                     */
@@ -140,36 +145,41 @@ public class AddActivity extends Activity
         mWifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
         if (mBluetoothManager != null) mBluetoothAdapter = mBluetoothManager.getAdapter();
 
-        mExpireThread = new Thread(ExpireThread);
-        mExpireThread.start();
+        autoGrantDangerousPermissionsIfPossible();
+    }
 
-        //Register USB Receivers
-        registerReceiver(mUsbReceiver,new IntentFilter(UsbManager.ACTION_USB_DEVICE_ATTACHED));
-        registerReceiver(mUsbReceiver,new IntentFilter(UsbManager.ACTION_USB_DEVICE_DETACHED));
+    private void autoGrantDangerousPermissionsIfPossible() {
+        String deviceManufacturer = Build.MANUFACTURER;
+        if((deviceManufacturer.contains("Zebra")||deviceManufacturer.contains("ZEBRA")) &&
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                CriticalPermissionsHelper.grantPermission(this, EPermissionType.ALL_DANGEROUS_PERMISSIONS, new IResultCallbacks() {
+                    @Override
+                    public void onSuccess(String message, String resultXML) {
+                        Log.d("CriticPermHelp", EPermissionType.ALL_DANGEROUS_PERMISSIONS.toString() + " granted with success.");
+                        AddActivity.this.runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                checkPermissions();
+                            }
+                        });
+                    }
 
-        //Register Network Receiver
-        registerReceiver(mNetReceiver,new IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION));
+                    @Override
+                    public void onError(String message, String resultXML) {
+                        Log.d("CriticPermHelp", "Error granting " + EPermissionType.ALL_DANGEROUS_PERMISSIONS.toString() + " permission.\n" + message);
+                        AddActivity.this.runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                checkPermissions();
+                            }
+                        });
+                    }
 
-        String deviceManufacturer = android.os.Build.MANUFACTURER;
-        if(deviceManufacturer.contains("Zebra")||deviceManufacturer.contains("ZEBRA")) {
-            CriticalPermissionsHelper.grantPermission(this, EPermissionType.ALL_DANGEROUS_PERMISSIONS, new IResultCallbacks() {
-            @Override
-            public void onSuccess(String message, String resultXML) {
-                Log.d("CriticPermHelp", EPermissionType.ALL_DANGEROUS_PERMISSIONS.toString() + " granted with success.");
-                checkPermissions();
-            }
-
-            @Override
-            public void onError(String message, String resultXML) {
-                Log.d("CriticPermHelp", "Error granting " + EPermissionType.ALL_DANGEROUS_PERMISSIONS.toString() + " permission.\n" + message);
-                checkPermissions();
-            }
-
-            @Override
-            public void onDebugStatus(String message) {
-                Log.d("CriticPermHelp", "Debug Grant Permission " + EPermissionType.ALL_DANGEROUS_PERMISSIONS.toString() + ": " + message);
-            }
-            });
+                    @Override
+                    public void onDebugStatus(String message) {
+                        Log.d("CriticPermHelp", "Debug Grant Permission " + EPermissionType.ALL_DANGEROUS_PERMISSIONS.toString() + ": " + message);
+                    }
+                });
         }
         else
         {
@@ -184,6 +194,17 @@ public class AddActivity extends Activity
     protected void onResume()
     {
         super.onResume();
+
+        mExpireThread = new Thread(ExpireThread);
+        mExpireThread.start();
+
+        //Register USB Receivers
+        registerReceiver(mUsbReceiver,new IntentFilter(UsbManager.ACTION_USB_DEVICE_ATTACHED));
+        registerReceiver(mUsbReceiver,new IntentFilter(UsbManager.ACTION_USB_DEVICE_DETACHED));
+
+        //Register Network Receiver
+        registerReceiver(mNetReceiver,new IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION));
+
         //Register BT Receivers
         registerReceiver(mBTReceiver, new IntentFilter(BluetoothDevice.ACTION_FOUND));
         registerReceiver(mBTReceiver, new IntentFilter(BluetoothAdapter.ACTION_DISCOVERY_FINISHED));
@@ -197,7 +218,20 @@ public class AddActivity extends Activity
     {
         super.onPause();
         unregisterReceiver(mBTReceiver);
-        if (mBluetoothAdapter != null && mBluetoothAdapter.isDiscovering()) mBluetoothAdapter.cancelDiscovery();
+        unregisterReceiver(mUsbReceiver);
+        unregisterReceiver(mNetReceiver);
+        if(mExpireThread != null && mExpireThread.isAlive())
+        {
+            try {
+                mExpireThread.interrupt();
+            }
+            catch(Exception e)
+            {
+                e.printStackTrace();
+            }
+        }
+        if (mBluetoothAdapter != null && mBluetoothAdapter.isDiscovering())
+            mBluetoothAdapter.cancelDiscovery();
     }
 
     /***********************************************************************************************/
@@ -209,6 +243,7 @@ public class AddActivity extends Activity
             if (DEBUG) Log.d(TAG, "onDestroy()");
             bQuit = true;
             bNetQuit = true;
+            unregisterReceiver(mBTReceiver);
             unregisterReceiver(mUsbReceiver);
             unregisterReceiver(mNetReceiver);
             mNetworkThread.join();
@@ -275,8 +310,19 @@ public class AddActivity extends Activity
         //Add any Network Printers
         findNetPrinter();
 
-        if (mBluetoothAdapter != null && !mBluetoothAdapter.isDiscovering())
+        if (mBluetoothAdapter != null && !mBluetoothAdapter.isDiscovering()) {
+            if(DEBUG) Log.d(TAG, "Starting bluetooth discovery");
             mBluetoothAdapter.startDiscovery();
+        }
+        if(mBluetoothAdapter == null)
+        {
+            if(DEBUG) Log.e(TAG, "No bluetooth adapter");
+        }
+
+        if(mBluetoothAdapter.isDiscovering())
+        {
+            if(DEBUG) Log.e(TAG, "BluetoothAdapter already discovering");
+        }
 
        //Find already paired devices.
         findPairedBluetooth();
@@ -406,7 +452,51 @@ public class AddActivity extends Activity
         }
         return false;
     }
+
     /***********************************************************************************************/
+    private class UsbReceiver extends BroadcastReceiver
+    {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            if (ACTION_USB_PERMISSION.equalsIgnoreCase(action)) {
+                synchronized (this)
+                {
+                    UsbDevice device = (UsbDevice) intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
+
+                    if (intent.getBooleanExtra(
+                            UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
+                        if (device != null) {
+                            if (DEBUG)
+                                Log.v(TAG, "Found USB Printer :" + device.getProductName() + " VID:" + device.getVendorId() + " PID:" + device.getProductId() + " -> " + device.getDeviceName());
+                            PrinterDatabase.Printer printer = new PrinterDatabase.Printer();
+                            printer.mName = device.getProductName();
+                            printer.mPrinter = device.getProductName();
+                            printer.mAddress = device.getDeviceName();
+                            printer.mType = "usb";
+                            printer.mDPI = 203;
+                            printer.mPrinterId = device.getDeviceName();
+                            printer.mDescription = getString(R.string.usb);
+                            if (alreadySelected(printer)) return;
+                            mPrinterAdapter.add(printer);
+                            mPrinterAdapter.notifyDataSetChanged();
+                        }
+                    } else {
+
+                    }
+                    if(mUsbPermissionReceiver != null)
+                    {
+                        unregisterReceiver(mUsbPermissionReceiver);
+                        mUsbPermissionReceiver = null;
+                    }
+                }
+            }
+        }
+    }
+
+
+    /***********************************************************************************************/
+
     private void findUsbPrinters()
     {
         if (mUsbManager != null)
@@ -415,9 +505,14 @@ public class AddActivity extends Activity
             for (String deviceName : deviceList.keySet())
             {
                 UsbDevice device = deviceList.get(deviceName);
-                if (device.getInterfaceCount() > 0)
+                if (device.getInterfaceCount() > 0 && device.getInterface(0).getInterfaceClass() == 0x07)
                 {
-                    if (device.getInterface(0).getInterfaceClass() == 0x07)
+                    // Check if we have permission to access to this device
+                    // otherwise, the getSerialNumber method will lead to an exception
+                    if(mUsbManager.hasPermission(device) == false) {
+                        autoAllowUSBDeviceIfPossible(device);
+                    }
+                    else
                     {
                         if (DEBUG) Log.v(TAG, "Found USB Printer :" + device.getProductName() + " VID:" + device.getVendorId() + " PID:" + device.getProductId() + " -> " + deviceName);
                         PrinterDatabase.Printer printer = new PrinterDatabase.Printer();
@@ -434,8 +529,103 @@ public class AddActivity extends Activity
                     }
                 }
             }
+            if(mUsbPermissionReceiver != null) {
+                unregisterReceiver(mUsbPermissionReceiver);
+                mUsbPermissionReceiver = null;
+            }
         }
     }
+
+    private void autoAllowUSBDeviceIfPossible(UsbDevice device) {
+        String deviceManufacturer = Build.MANUFACTURER;
+        if(ZebraPrintService.ZEBRA_EXTENSIONS && (deviceManufacturer.contains("Zebra")||deviceManufacturer.contains("ZEBRA")) &&
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
+        {
+            String certificate = PackageManagementHelper.getSignature(mCtx, null);
+            if(certificate == null) {
+                if (DEBUG)
+                    Log.d(TAG, "getSignature error, couldn't retrieve app certificate");
+                requestAndroidUSBPermission(device);
+                return;
+            }
+            String packageName = PackageManagementHelper.getPackageName(mCtx, null);
+            if(packageName == null) {
+                if (DEBUG)
+                    Log.d(TAG, "getSignature error, couldn't retrieve app certificate");
+                requestAndroidUSBPermission(device);
+                return;
+            }
+
+            String controlRule = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
+                    "<popupsuppress>\n" +
+                    " <rule>\n" +
+                    "   <pkg>" + packageName + "</pkg>\n" +
+                    "   <cert>" + certificate + "</cert> \n" +
+                    "   <vid vendorid=\""+ device.getVendorId() + "\">\n" +
+                    "   <pid>" + device.getProductId() + "</pid></vid>\n" +
+                    " </rule>\n" +
+                    "</popupsuppress>\n" +
+                    "\n" +
+                    "<usbconfig mode=\"whitelist\">\n" +
+                    "  <class>USB_CLASS_PRINTER</class>\n" +
+                    "</usbconfig>";
+            UsbPopupRemovalHelper.processRawControlRuleXML(this, controlRule, new com.zebra.usbpopupremovalhelper.IResultCallbacks() {
+                @Override
+                public void onSuccess(String message, String ResultXML) {
+                    if (DEBUG)
+                        Log.d(TAG, "USBPermission success message: " + message + "\nResultXML: " + ResultXML);
+                    if (device != null) {
+                        if (DEBUG)
+                            Log.v(TAG, "Found USB Printer :" + device.getProductName() + " VID:" + device.getVendorId() + " PID:" + device.getProductId() + " -> " + device.getDeviceName());
+                        PrinterDatabase.Printer printer = new PrinterDatabase.Printer();
+                        printer.mName = device.getProductName();
+                        printer.mPrinter = device.getProductName();
+                        printer.mAddress = device.getDeviceName();
+                        printer.mType = "usb";
+                        printer.mDPI = 203;
+                        printer.mPrinterId = device.getDeviceName();
+                        printer.mDescription = getString(R.string.usb);
+                        if (alreadySelected(printer)) return;
+                        mPrinterAdapter.add(printer);
+                        mPrinterAdapter.notifyDataSetChanged();
+                    }
+                    else
+                    {
+                        Log.e(TAG, "USBPermission : Device is null !!! contact your developper....");
+                    }
+                }
+
+                @Override
+                public void onError(String message, String ResultXML) {
+                    if (DEBUG)
+                        Log.d(TAG, "USBPermission error message: " + message + "\nResultXML: " + ResultXML);
+                    requestAndroidUSBPermission(device);
+                }
+
+                @Override
+                public void onDebugStatus(String s) {
+                    if (DEBUG)
+                        Log.d(TAG, "USBPermission: " + s);
+                }
+            });
+        }
+        else {
+            if (DEBUG)
+                Log.d(TAG, "USBPermission: not a Zebra device");
+            requestAndroidUSBPermission(device);
+        }
+    }
+
+    private void requestAndroidUSBPermission(UsbDevice device) {
+        mUsbPermissionReceiver = new UsbReceiver();
+        PendingIntent mPermissionIntent = PendingIntent.getBroadcast(this, 0, new Intent(
+                ACTION_USB_PERMISSION), PendingIntent.FLAG_IMMUTABLE);
+
+        IntentFilter filter = new IntentFilter(ACTION_USB_PERMISSION);
+        registerReceiver(mUsbPermissionReceiver, filter);
+        mUsbManager.requestPermission(device, mPermissionIntent);
+    }
+
     /**********************************************************************************************/
     private void findNetPrinter()
     {
@@ -467,10 +657,12 @@ public class AddActivity extends Activity
         {
             BluetoothClass mBtClass = device.getBluetoothClass();
             if (DEBUG) Log.i(TAG, "Bonded : " + device.getAddress() + " COD: " + mBtClass.getDeviceClass() + " -> " + device.getName());
-            //if (!DEBUG)
+            if (!DEBUG)
             {
-                if (mBtClass.getMajorDeviceClass() != BluetoothClass.Device.Major.IMAGING) continue;
-                if (mBtClass.getDeviceClass() != 1664) continue;
+                int majorDeviceClass = mBtClass.getMajorDeviceClass();
+                int mDeviceClass = mBtClass.getDeviceClass();
+                if (majorDeviceClass != BluetoothClass.Device.Major.IMAGING) continue;
+                if (mDeviceClass != 1664) continue;
             }
 
             PrinterDatabase.Printer printer = new PrinterDatabase.Printer();

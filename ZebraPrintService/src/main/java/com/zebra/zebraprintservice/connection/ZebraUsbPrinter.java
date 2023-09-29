@@ -11,11 +11,17 @@ import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbEndpoint;
 import android.hardware.usb.UsbInterface;
 import android.hardware.usb.UsbManager;
+import android.os.Build;
 import android.os.Handler;
 import android.util.Log;
 
+import com.zebra.usbpopupremovalhelper.EDeviceClass;
+import com.zebra.usbpopupremovalhelper.IResultCallbacks;
+import com.zebra.usbpopupremovalhelper.PackageManagementHelper;
+import com.zebra.usbpopupremovalhelper.UsbPopupRemovalHelper;
 import com.zebra.zebraprintservice.BuildConfig;
 import com.zebra.zebraprintservice.database.PrinterDatabase;
+import com.zebra.zebraprintservice.service.ZebraPrintService;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -56,6 +62,10 @@ public class ZebraUsbPrinter extends PrinterConnection
 
         mCtx.registerReceiver(UsbReciever,new IntentFilter(ACTION_USB_PERMISSION));
 
+        updateDeviceAvailability();
+    }
+
+    public void updateDeviceAvailability() {
         if (mUsbManager != null)
         {
             HashMap<String, UsbDevice> deviceList = mUsbManager.getDeviceList();
@@ -67,7 +77,7 @@ public class ZebraUsbPrinter extends PrinterConnection
                     if (device.getInterface(0).getInterfaceClass() == 0x07)
                     {
                         if (DEBUG) Log.v(TAG, "Found USB Printer :" + device.getProductName() + " VID:" + device.getVendorId() + " PID:" + device.getProductId() + " -> " + deviceName);
-                        if (printer.mAddress.equals(device.getDeviceName())) mDevice = device;
+                        if (getPrinter().mAddress.equals(device.getDeviceName())) mDevice = device;
                     }
                 }
             }
@@ -140,6 +150,8 @@ public class ZebraUsbPrinter extends PrinterConnection
     @Override
     public boolean isAvailable()
     {
+        //return true;
+        updateDeviceAvailability();
         return mDevice != null;
     }
     /*********************************************************************************************/
@@ -153,15 +165,8 @@ public class ZebraUsbPrinter extends PrinterConnection
         if (DEBUG) Log.d(TAG, "connect()");
         if (!mUsbManager.hasPermission(mDevice))
         {
-            mHandler.post(new Runnable()
-            {
-                @Override
-                public void run()
-                {
-                    mUsbManager.requestPermission(mDevice, mPermissionIntent);
-                }
-            });
-        return;
+            autograntUSBPermissionIfPossible();
+            return;
         }
 
         if (DEBUG) Log.i(TAG,"Setting up USB");
@@ -185,6 +190,78 @@ public class ZebraUsbPrinter extends PrinterConnection
         mOutput = new USBOutputStream(mUsbConnection, mEndpointBulkOut);
         mInput = new USBInputStream(mUsbConnection,mEndpointBulkIn);
         callback.onConnected();
+    }
+
+    private void autograntUSBPermissionIfPossible() {
+        mHandler.post(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                String deviceManufacturer = Build.MANUFACTURER;
+                if(ZebraPrintService.ZEBRA_EXTENSIONS && (deviceManufacturer.contains("Zebra")||deviceManufacturer.contains("ZEBRA")) &&
+                        Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
+                {
+
+                    String certificate = PackageManagementHelper.getSignature(mCtx, null);
+                    if(certificate == null) {
+                        if (DEBUG)
+                            Log.d(TAG, "getSignature error, couldn't retrieve app certificate");
+                        mUsbManager.requestPermission(mDevice, mPermissionIntent);
+                        return;
+                    }
+
+                    String packageName = PackageManagementHelper.getPackageName(mCtx, null);
+                    if(packageName == null) {
+                        if (DEBUG)
+                            Log.d(TAG, "getSignature error, couldn't retrieve app certificate");
+                        mUsbManager.requestPermission(mDevice, mPermissionIntent);
+                        return;
+                    }
+
+                    String controlRule = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
+                            "<popupsuppress>\n" +
+                            " <rule>\n" +
+                            "   <pkg>" + packageName + "</pkg>\n" +
+                            "   <cert>" + certificate + "</cert> \n" +
+                            "   <vid vendorid=\""+ mDevice.getVendorId() + "\">\n" +
+                            "   <pid>" + mDevice.getProductId() + "</pid></vid>\n" +
+                            " </rule>\n" +
+                            "</popupsuppress>\n" +
+                            "\n" +
+                            "<usbconfig mode=\"whitelist\">\n" +
+                            "  <class>USB_CLASS_PRINTER</class>\n" +
+                            "</usbconfig>";
+                    UsbPopupRemovalHelper.processRawControlRuleXML(mCtx, controlRule, new IResultCallbacks() {
+                                @Override
+                                public void onSuccess(String message, String ResultXML) {
+                                    if (DEBUG)
+                                        Log.d(TAG, "USBPermission success message: " + message + "\nResultXML: " + ResultXML);
+
+                                }
+
+                                @Override
+                                public void onError(String message, String ResultXML) {
+                                    if (DEBUG)
+                                        Log.d(TAG, "USBPermission error message: " + message + "\nResultXML: " + ResultXML);
+                                    mUsbManager.requestPermission(mDevice, mPermissionIntent);
+                                }
+
+                                @Override
+                                public void onDebugStatus(String s) {
+                                    if (DEBUG)
+                                        Log.d(TAG, "USBPermission: " + s);
+                                }
+                            });
+                }
+                else
+                {
+                    if (DEBUG)
+                        Log.d(TAG, "USBPermission: not a Zebra device");
+                    mUsbManager.requestPermission(mDevice, mPermissionIntent);
+                }
+            }
+        });
     }
 
     /*********************************************************************************************/

@@ -21,6 +21,7 @@ import android.widget.Toast;
 import com.zebra.criticalpermissionshelper.CriticalPermissionsHelper;
 import com.zebra.criticalpermissionshelper.EPermissionType;
 import com.zebra.criticalpermissionshelper.IResultCallbacks;
+import com.zebra.zebraprintservice.BuildConfig;
 import com.zebra.zebraprintservice.database.PrinterDatabase;
 import com.zebra.zebraprintservice.R;
 import com.zebra.zebraprintservice.service.ZebraPrintService;
@@ -30,6 +31,8 @@ import java.util.List;
 
 public class SettingsActivity extends Activity
 {
+    private static final boolean DEBUG = BuildConfig.DEBUG & true;
+
     private ZebraPrintService printService;
     private TextView mVersion;
     private TextView mServiceVersion;
@@ -139,6 +142,12 @@ public class SettingsActivity extends Activity
                 return true;
             }
 
+            case R.id.addPrinters:
+            {
+                startActivity(new Intent(this, AddActivity.class));
+                return true;
+            }
+
             case R.id.importPrinters:
             {
                 Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
@@ -164,24 +173,30 @@ public class SettingsActivity extends Activity
         super.onResume();
         String deviceManufacturer = android.os.Build.MANUFACTURER;
         if(deviceManufacturer.contains("Zebra")||deviceManufacturer.contains("ZEBRA")) {
-            CriticalPermissionsHelper.grantPermission(this, EPermissionType.ALL_DANGEROUS_PERMISSIONS, new IResultCallbacks() {
-                @Override
-                public void onSuccess(String message, String resultXML) {
-                    Log.d("CriticPermHelp", EPermissionType.ALL_DANGEROUS_PERMISSIONS.toString() + " granted with success.");
-                    checkAndroidPermissions();
-                }
 
-                @Override
-                public void onError(String message, String resultXML) {
-                    Log.d("CriticPermHelp", "Error granting " + EPermissionType.ALL_DANGEROUS_PERMISSIONS.toString() + " permission.\n" + message);
-                    checkAndroidPermissions();
-                }
+            if(DEBUG) {
+                CriticalPermissionsHelper.grantPermission(this, EPermissionType.ALL_DANGEROUS_PERMISSIONS, new IResultCallbacks() {
+                    @Override
+                    public void onSuccess(String message, String resultXML) {
+                        Log.d("CriticPermHelp", EPermissionType.ALL_DANGEROUS_PERMISSIONS.toString() + " granted with success.");
+                        checkAndroidPermissions();
+                    }
 
-                @Override
-                public void onDebugStatus(String message) {
-                    Log.d("CriticPermHelp", "Debug Grant Permission " + EPermissionType.ALL_DANGEROUS_PERMISSIONS.toString() + ": " + message);
-                }
-            });
+                    @Override
+                    public void onError(String message, String resultXML) {
+                        Log.d("CriticPermHelp", "Error granting " + EPermissionType.ALL_DANGEROUS_PERMISSIONS.toString() + " permission.\n" + message);
+                        checkAndroidPermissions();
+                    }
+
+                    @Override
+                    public void onDebugStatus(String message) {
+                        Log.d("CriticPermHelp", "Debug Grant Permission " + EPermissionType.ALL_DANGEROUS_PERMISSIONS.toString() + ": " + message);
+                    }
+                });
+            }
+            else {
+                checkAndroidPermissions();
+            }
         }
         else
         {

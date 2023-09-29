@@ -19,6 +19,9 @@ public abstract class PrinterConnection
     }
 
     public abstract boolean isAvailable();
+
+    public abstract void updateDeviceAvailability();
+
     public abstract void connect(ConnectionCallback callback);
     public abstract void disconnect();
     public abstract void destroy();

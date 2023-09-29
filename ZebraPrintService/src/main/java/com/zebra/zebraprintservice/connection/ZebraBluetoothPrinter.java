@@ -128,6 +128,10 @@ public class ZebraBluetoothPrinter extends PrinterConnection
         return true;
     }
 
+    @Override
+    public void updateDeviceAvailability() {
+    }
+
     /*********************************************************************************************/
     @Override
     public void connect(ConnectionCallback callback)

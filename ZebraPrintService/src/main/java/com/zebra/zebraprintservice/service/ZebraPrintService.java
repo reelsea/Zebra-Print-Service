@@ -36,6 +36,9 @@ import java.util.Map;
 public class ZebraPrintService extends PrintService
 {
     private static final String TAG = ZebraPrintService.class.getSimpleName();
+
+    public static final boolean ZEBRA_EXTENSIONS = false;
+
     private static final boolean DEBUG = BuildConfig.DEBUG & true;
     private HashMap<PrinterId, ZebraPrinter> mPrinters = new HashMap<>();
     public static native String getUtilsVersion();

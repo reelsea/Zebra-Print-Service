@@ -59,6 +59,8 @@ public class ZebraPrinter implements Handler.Callback
     private static final int MSG_GET_JOB                = 4;
     private static final int MSG_QUIT                   = 5;
     private static final int MSG_SEND_PDF_DATA          = 6;
+    private static final int MSG_START_STRACKING          = 7;
+    private static final int MSG_STOP_STRACKING          = 8;
     private static final int MAX_STATUS_RESPONSE        = 500;
     private int mPrinterStatus = PrinterInfo.STATUS_IDLE;
     private final List<PrintJob> mJobs = new CopyOnWriteArrayList<>();
@@ -146,17 +148,24 @@ public class ZebraPrinter implements Handler.Callback
         });
     }
 
+    public void getDetails()
+    {
+        if (DEBUG) Log.d(TAG, "getDetails() -> " + mPrinterId.getLocalId());
+        mMsgHandler.obtainMessage(MSG_GET_DETAILS).sendToTarget();
+    }
+
     /*********************************************************************************************/
     public void startTracking()
     {
         if (DEBUG) Log.d(TAG, "startTracking() -> " + mPrinterId.getLocalId());
-        mMsgHandler.obtainMessage(MSG_GET_DETAILS).sendToTarget();
+        mMsgHandler.obtainMessage(MSG_START_STRACKING).sendToTarget();
     }
 
     /*********************************************************************************************/
     public void stopTracking()
     {
         if (DEBUG) Log.d(TAG, "stopTracking() -> " + mPrinterId.getLocalId());
+        mMsgHandler.obtainMessage(MSG_STOP_STRACKING).sendToTarget();
     }
     /*********************************************************************************************/
     public boolean isAvailable()
@@ -255,6 +264,16 @@ public class ZebraPrinter implements Handler.Callback
 
             case MSG_GET_DETAILS:
                 MsgGetDetails(true);
+                return true;
+
+           case MSG_START_STRACKING:
+               MsgGetDetails(true);
+
+               //connectForTracking();
+                return true;
+
+            case MSG_STOP_STRACKING:
+                //disconnectForTracking();
                 return true;
 
             case MSG_QUIT:
@@ -797,6 +816,16 @@ public class ZebraPrinter implements Handler.Callback
         }
         // Finish the job.
         finishJob();
+    }
+
+    private void connectForTracking()
+    {
+        mConnection.updateDeviceAvailability();
+    }
+
+
+    private void disconnectForTracking()
+    {
     }
 
     /**********************************************************************************************/

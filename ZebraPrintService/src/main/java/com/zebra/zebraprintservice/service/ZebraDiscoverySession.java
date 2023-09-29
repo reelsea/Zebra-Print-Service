@@ -41,7 +41,32 @@ public class ZebraDiscoverySession extends PrinterDiscoverySession
 
         //Remove Any Printers not in Database
         List<PrinterInfo> mCurrentList = getPrinters();
+        List<PrinterId> printersToRemove = new ArrayList<>();
 
+        for(PrinterId printerId : priorityList)
+        {
+            boolean bFound = false;
+            ZebraPrinter print = mService.getPrinter(printerId,this);
+            if(print != null) {
+                for (PrinterDatabase.Printer stored : printers) {
+                    if (DEBUG) Log.d(TAG, "Stored ID:" + stored.mPrinterId);
+                    if (stored.mPrinterId.equals(printerId)) {
+                        bFound = true;
+                        if (DEBUG) Log.d(TAG, "Found ID:" + stored.mPrinterId);
+                        mDb.replacePrinter(print.getPrinterInfo(), stored);
+                    }
+                }
+                if (bFound == false) {
+                    if (DEBUG) Log.d(TAG, "Printer not found in database.");
+                        printersToRemove.add(printerId);
+                }
+            }
+            else
+            {
+                if (DEBUG) Log.d(TAG, "Can not find printer with ID:" + printerId.getLocalId());
+                printersToRemove.add(printerId);
+            }
+        }
 
         if (DEBUG) Log.d(TAG, "Printers in stystem:" + mCurrentList.size());
         for (PrinterInfo printer : mCurrentList)
@@ -59,10 +84,14 @@ public class ZebraDiscoverySession extends PrinterDiscoverySession
                     mDb.replacePrinter(printer, stored);
                 }
             }
+            if (bFound == false) {
+                if (DEBUG) Log.d(TAG, "Printer not found in database. id:" + printer.getId().getLocalId() + " will be removed.");
+                printersToRemove.add(printer.getId());
+            }
             if (DEBUG) Log.d(TAG, "------------------------------------------");
-            if (bFound == false)
-                removePrinters(Collections.singletonList(printer.getId()));
         }
+        if(printersToRemove.size() > 0)
+           removePrinters(printersToRemove);
 
         // Remove all existing printers
         // TODO: check why actual printers get a pb when re discovered
@@ -74,15 +103,23 @@ public class ZebraDiscoverySession extends PrinterDiscoverySession
 
         //Add Printers from database
         int iReqCode =1;
+        if (DEBUG) Log.i(TAG,"Database Size:" + printers.size());
         for (PrinterDatabase.Printer printer : printers)
         {
             PrinterId printerId= mService.generatePrinterId(printer.mPrinterId);
             ZebraPrinter print = mService.getPrinter(printerId,this);
+            if (DEBUG) {
+                Log.i(TAG,"PrinterID:" + printer.mPrinterId);
+                Log.i(TAG,"Printer:" + print.getPrinterInfo().getName());
+                Log.i(TAG,"Printer available:" + print.isAvailable());
+            }
             if (print != null)
             {
+                print.getDetails();
+
                 Intent i = new Intent(mService,PrinterInfoActivity.class);
                 i.putExtra("printer", Parcels.wrap(printer));
-                PendingIntent pi = PendingIntent.getActivity(mService,iReqCode,i,PendingIntent.FLAG_CANCEL_CURRENT | PendingIntent.FLAG_MUTABLE);
+                PendingIntent pi = PendingIntent.getActivity(mService,iReqCode,i,PendingIntent.FLAG_CANCEL_CURRENT | PendingIntent.FLAG_IMMUTABLE);
                 if (DEBUG) Log.i(TAG,"Adding Printer:" + printerId.getLocalId());
                 PrinterInfo.Builder builder = new PrinterInfo.Builder(printerId, printer.mName,print.isAvailable() ? PrinterInfo.STATUS_IDLE : PrinterInfo.STATUS_UNAVAILABLE)
                         .setIconResourceId(R.drawable.ic_printer)
