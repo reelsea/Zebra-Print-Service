@@ -1,12 +1,8 @@
 package com.zebra.zebraprintservice.service;
 
-import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.RestrictionsManager;
 import android.graphics.Bitmap;
-import android.os.Bundle;
-import android.os.Parcelable;
 import android.print.PrinterId;
 import android.printservice.PrintJob;
 import android.printservice.PrintService;
@@ -27,7 +23,6 @@ import com.zebra.zebraprintservice.managedconfiguration.APP_Restrictions_Changed
 import com.zebra.zebraprintservice.managedconfiguration.ManagedConfigurationHelper;
 
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -37,9 +32,9 @@ public class ZebraPrintService extends PrintService
 {
     private static final String TAG = ZebraPrintService.class.getSimpleName();
 
-    public static final boolean ZEBRA_EXTENSIONS = false;
 
     private static final boolean DEBUG = BuildConfig.DEBUG & true;
+    public static final boolean USE_ZEBRA_EXTENSIONS = false && DEBUG;
     private HashMap<PrinterId, ZebraPrinter> mPrinters = new HashMap<>();
     public static native String getUtilsVersion();
     public static native String createBitmapZPL(Bitmap bitmap);

@@ -15,7 +15,6 @@ import android.os.Build;
 import android.os.Handler;
 import android.util.Log;
 
-import com.zebra.usbpopupremovalhelper.EDeviceClass;
 import com.zebra.usbpopupremovalhelper.IResultCallbacks;
 import com.zebra.usbpopupremovalhelper.PackageManagementHelper;
 import com.zebra.usbpopupremovalhelper.UsbPopupRemovalHelper;
@@ -199,7 +198,7 @@ public class ZebraUsbPrinter extends PrinterConnection
             public void run()
             {
                 String deviceManufacturer = Build.MANUFACTURER;
-                if(ZebraPrintService.ZEBRA_EXTENSIONS && (deviceManufacturer.contains("Zebra")||deviceManufacturer.contains("ZEBRA")) &&
+                if(ZebraPrintService.USE_ZEBRA_EXTENSIONS && (deviceManufacturer.contains("Zebra")||deviceManufacturer.contains("ZEBRA")) &&
                         Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
                 {
 
@@ -244,7 +243,8 @@ public class ZebraUsbPrinter extends PrinterConnection
                                 public void onError(String message, String ResultXML) {
                                     if (DEBUG)
                                         Log.d(TAG, "USBPermission error message: " + message + "\nResultXML: " + ResultXML);
-                                    mUsbManager.requestPermission(mDevice, mPermissionIntent);
+                                    if (!mUsbManager.hasPermission(mDevice))
+                                        mUsbManager.requestPermission(mDevice, mPermissionIntent);
                                 }
 
                                 @Override
@@ -258,7 +258,8 @@ public class ZebraUsbPrinter extends PrinterConnection
                 {
                     if (DEBUG)
                         Log.d(TAG, "USBPermission: not a Zebra device");
-                    mUsbManager.requestPermission(mDevice, mPermissionIntent);
+                    if (!mUsbManager.hasPermission(mDevice))
+                        mUsbManager.requestPermission(mDevice, mPermissionIntent);
                 }
             }
         });

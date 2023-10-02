@@ -37,7 +37,6 @@ import androidx.appcompat.app.AlertDialog;
 import com.zebra.criticalpermissionshelper.CriticalPermissionsHelper;
 import com.zebra.criticalpermissionshelper.EPermissionType;
 import com.zebra.criticalpermissionshelper.IResultCallbacks;
-import com.zebra.usbpopupremovalhelper.EDeviceClass;
 import com.zebra.usbpopupremovalhelper.PackageManagementHelper;
 import com.zebra.usbpopupremovalhelper.UsbPopupRemovalHelper;
 import com.zebra.zebraprintservice.BuildConfig;
@@ -64,7 +63,7 @@ import java.util.Set;
 public class AddActivity extends Activity
 {
     private static final String TAG = AddActivity.class.getSimpleName();
-    private static final boolean DEBUG = BuildConfig.DEBUG & true;
+    private static final boolean DEBUG = BuildConfig.DEBUG;
 
     private static final String MULTICAST_ADDRESS = "224.0.1.55";
     private static final int MULTICAST_PORT = 4201;
@@ -91,7 +90,6 @@ public class AddActivity extends Activity
     private PrinterAdapter mPrinterAdapter;
     private Context mCtx;
 
-    private UsbReceiver mUsbPermissionReceiver;
 
     /***********************************************************************************************/
     /** Permissions management                                                                     */
@@ -151,7 +149,8 @@ public class AddActivity extends Activity
     private void autoGrantDangerousPermissionsIfPossible() {
         String deviceManufacturer = Build.MANUFACTURER;
         if((deviceManufacturer.contains("Zebra")||deviceManufacturer.contains("ZEBRA")) &&
-                Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                ZebraPrintService.USE_ZEBRA_EXTENSIONS) {
                 CriticalPermissionsHelper.grantPermission(this, EPermissionType.ALL_DANGEROUS_PERMISSIONS, new IResultCallbacks() {
                     @Override
                     public void onSuccess(String message, String resultXML) {
@@ -289,9 +288,18 @@ public class AddActivity extends Activity
 
                         startService (new Intent (AddActivity.this, ZebraPrintService.class));
                         Toast.makeText(AddActivity.this, "Starting Print Service",Toast.LENGTH_SHORT).show();
+                        findPrinters();
                     }
                 }, 2000);
             break;
+            case R.id.remove_all_printers:
+                if(mDb != null)
+                {
+                    mDb.deleteAll();
+                    Toast.makeText(this, "All printers have been deleted from database.", Toast.LENGTH_SHORT).show();
+                    findPrinters();
+                    break;
+                }
         }
         return super.onMenuItemSelected(featureId, item);
     }
@@ -484,11 +492,7 @@ public class AddActivity extends Activity
                     } else {
 
                     }
-                    if(mUsbPermissionReceiver != null)
-                    {
-                        unregisterReceiver(mUsbPermissionReceiver);
-                        mUsbPermissionReceiver = null;
-                    }
+                    AddActivity.this.unregisterReceiver(this);
                 }
             }
         }
@@ -529,16 +533,12 @@ public class AddActivity extends Activity
                     }
                 }
             }
-            if(mUsbPermissionReceiver != null) {
-                unregisterReceiver(mUsbPermissionReceiver);
-                mUsbPermissionReceiver = null;
-            }
         }
     }
 
     private void autoAllowUSBDeviceIfPossible(UsbDevice device) {
         String deviceManufacturer = Build.MANUFACTURER;
-        if(ZebraPrintService.ZEBRA_EXTENSIONS && (deviceManufacturer.contains("Zebra")||deviceManufacturer.contains("ZEBRA")) &&
+        if(ZebraPrintService.USE_ZEBRA_EXTENSIONS && (deviceManufacturer.contains("Zebra")||deviceManufacturer.contains("ZEBRA")) &&
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
         {
             String certificate = PackageManagementHelper.getSignature(mCtx, null);
@@ -617,12 +617,12 @@ public class AddActivity extends Activity
     }
 
     private void requestAndroidUSBPermission(UsbDevice device) {
-        mUsbPermissionReceiver = new UsbReceiver();
+        final UsbReceiver UsbPermissionReceiver = new UsbReceiver();
         PendingIntent mPermissionIntent = PendingIntent.getBroadcast(this, 0, new Intent(
-                ACTION_USB_PERMISSION), PendingIntent.FLAG_IMMUTABLE);
+                ACTION_USB_PERMISSION), PendingIntent.FLAG_MUTABLE);
 
         IntentFilter filter = new IntentFilter(ACTION_USB_PERMISSION);
-        registerReceiver(mUsbPermissionReceiver, filter);
+        registerReceiver(UsbPermissionReceiver, filter);
         mUsbManager.requestPermission(device, mPermissionIntent);
     }
 

@@ -52,7 +52,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public class ZebraPrinter implements Handler.Callback
 {
     private static final String TAG = ZebraPrinter.class.getSimpleName();
-    private static final boolean DEBUG = BuildConfig.DEBUG & true;
+    private static final boolean DEBUG = BuildConfig.DEBUG;
     private static final int MSG_START_JOB              = 1;
     private static final int MSG_NEXT_PAGE              = 2;
     private static final int MSG_GET_DETAILS            = 3;
