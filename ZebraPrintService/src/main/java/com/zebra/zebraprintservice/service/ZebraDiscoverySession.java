@@ -57,8 +57,9 @@ public class ZebraDiscoverySession extends PrinterDiscoverySession
                     }
                 }
                 if (bFound == false) {
-                    if (DEBUG) Log.d(TAG, "Printer not found in database.");
-                        printersToRemove.add(printerId);
+                    if (DEBUG)
+                        Log.d(TAG, "Printer not found in database.");
+                    printersToRemove.add(printerId);
                 }
             }
             else
@@ -67,6 +68,8 @@ public class ZebraDiscoverySession extends PrinterDiscoverySession
                 printersToRemove.add(printerId);
             }
         }
+
+
 
         if (DEBUG) Log.d(TAG, "Printers in stystem:" + mCurrentList.size());
         for (PrinterInfo printer : mCurrentList)
@@ -117,20 +120,35 @@ public class ZebraDiscoverySession extends PrinterDiscoverySession
             {
                 print.getDetails();
 
-                Intent i = new Intent(mService,PrinterInfoActivity.class);
+                //List<PrinterId> foundPrinters = new ArrayList<>();
+                //for(PrinterInfo info : getPrinters())
+                //{
+                //    if(info.getName().equalsIgnoreCase(printer.mName)) {
+                //        foundPrinters.add(info.getId());
+                //    }
+                //}
+//
+                //if(foundPrinters.size() > 0)
+                //{
+                //    removePrinters(foundPrinters);
+                //}
+
+                Intent i = new Intent(mService, PrinterInfoActivity.class);
                 i.putExtra("printer", Parcels.wrap(printer));
-                PendingIntent pi = PendingIntent.getActivity(mService,iReqCode,i,PendingIntent.FLAG_CANCEL_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-                if (DEBUG) Log.i(TAG,"Adding Printer:" + printerId.getLocalId());
-                PrinterInfo.Builder builder = new PrinterInfo.Builder(printerId, printer.mName,print.isAvailable() ? PrinterInfo.STATUS_IDLE : PrinterInfo.STATUS_UNAVAILABLE)
+                PendingIntent pi = PendingIntent.getActivity(mService, iReqCode, i, PendingIntent.FLAG_CANCEL_CURRENT | PendingIntent.FLAG_MUTABLE);
+                if (DEBUG) Log.i(TAG, "Adding Printer:" + printerId.getLocalId());
+                PrinterInfo.Builder builder = new PrinterInfo.Builder(printerId, printer.mName, print.isAvailable() ? PrinterInfo.STATUS_IDLE : PrinterInfo.STATUS_UNAVAILABLE)
                         .setIconResourceId(R.drawable.ic_printer)
                         .setDescription(printer.mDescription)
                         .setInfoIntent(pi);
                 addPrinters(Collections.singletonList(builder.build()));
                 iReqCode++;
+
             }
         }
         mDb.close();
     }
+
 
     /**********************************************************************************************/
     @Override

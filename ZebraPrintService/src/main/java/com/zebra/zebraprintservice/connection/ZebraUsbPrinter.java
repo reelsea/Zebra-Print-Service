@@ -158,6 +158,9 @@ public class ZebraUsbPrinter extends PrinterConnection
     public void connect(final ConnectionCallback callback)
     {
         mCurrentCallback = callback;
+
+        //updateDeviceAvailability();
+
         if (mDevice == null) { callback.onConnectFailed(); return; }
         if (mInput != null) { callback.onConnected(); return; }
 

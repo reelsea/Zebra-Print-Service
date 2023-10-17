@@ -104,6 +104,7 @@ public class PrinterInfoActivity extends Activity
                 if (mSelected.mWidth == 0 || mSelected.mHeight == 0) return;
 
                 mDb.replacePrinter(mSelected);
+                mDb.close();
                 Intent i = new Intent();
                 i.putExtra("printer", Parcels.wrap(mSelected));
                 setResult(Activity.RESULT_OK,i);
