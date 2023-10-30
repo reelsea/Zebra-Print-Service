@@ -76,7 +76,15 @@ public class ZebraUsbPrinter extends PrinterConnection
                     if (device.getInterface(0).getInterfaceClass() == 0x07)
                     {
                         if (DEBUG) Log.v(TAG, "Found USB Printer :" + device.getProductName() + " VID:" + device.getVendorId() + " PID:" + device.getProductId() + " -> " + deviceName);
-                        if (getPrinter().mAddress.equals(device.getDeviceName())) mDevice = device;
+                        if (getPrinter().mAddress.equals(device.getDeviceName()))
+                        {
+                            mDevice = device;
+                            if (!mUsbManager.hasPermission(mDevice))
+                            {
+                                mUsbManager.requestPermission(mDevice, mPermissionIntent);
+                                return;
+                            }
+                        }
                     }
                 }
             }

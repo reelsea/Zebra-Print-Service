@@ -39,6 +39,8 @@ public class ZebraDiscoverySession extends PrinterDiscoverySession
         PrinterDatabase mDb = new PrinterDatabase(mService);
         ArrayList<PrinterDatabase.Printer> printers = mDb.getAllPrinters();
 
+
+        /*
         //Remove Any Printers not in Database
         List<PrinterInfo> mCurrentList = getPrinters();
         List<PrinterId> printersToRemove = new ArrayList<>();
@@ -96,13 +98,19 @@ public class ZebraDiscoverySession extends PrinterDiscoverySession
         if(printersToRemove.size() > 0)
            removePrinters(printersToRemove);
 
-        // Remove all existing printers
-        // TODO: check why actual printers get a pb when re discovered
-        //List<PrinterInfo> printersList = getPrinters();
-        //ArrayList<PrinterId> printersIds = new ArrayList<>(printersList.size());
-        //for(PrinterInfo printInfo : printersList)
-        //    printersIds.add(printInfo.getId());
-        //removePrinters(printersIds);
+        */
+
+        //Remove Any Printers not in Database
+        List<PrinterInfo> mCurrentList = getPrinters();
+        for (PrinterInfo printer : mCurrentList)
+        {
+            boolean bFound = false;
+            for (PrinterDatabase.Printer stored : printers)
+            {
+                if (stored.mPrinterId.equals(printer.getId())) bFound = true;
+            }
+            if (bFound == false) removePrinters(Collections.singletonList(printer.getId()));
+        }
 
         //Add Printers from database
         int iReqCode =1;
@@ -119,19 +127,6 @@ public class ZebraDiscoverySession extends PrinterDiscoverySession
             if (print != null)
             {
                 print.getDetails();
-
-                //List<PrinterId> foundPrinters = new ArrayList<>();
-                //for(PrinterInfo info : getPrinters())
-                //{
-                //    if(info.getName().equalsIgnoreCase(printer.mName)) {
-                //        foundPrinters.add(info.getId());
-                //    }
-                //}
-//
-                //if(foundPrinters.size() > 0)
-                //{
-                //    removePrinters(foundPrinters);
-                //}
 
                 Intent i = new Intent(mService, PrinterInfoActivity.class);
                 i.putExtra("printer", Parcels.wrap(printer));
