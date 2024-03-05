@@ -104,6 +104,7 @@ public class ZebraDiscoverySession extends PrinterDiscoverySession
         List<PrinterInfo> mCurrentList = getPrinters();
         for (PrinterInfo printer : mCurrentList)
         {
+            if (DEBUG) Log.i(TAG,"GetPrinters():Printer:" + printer.getName());
             boolean bFound = false;
             for (PrinterDatabase.Printer stored : printers)
             {
@@ -126,8 +127,6 @@ public class ZebraDiscoverySession extends PrinterDiscoverySession
             }
             if (print != null)
             {
-                print.getDetails();
-
                 Intent i = new Intent(mService, PrinterInfoActivity.class);
                 i.putExtra("printer", Parcels.wrap(printer));
                 PendingIntent pi = PendingIntent.getActivity(mService, iReqCode, i, PendingIntent.FLAG_CANCEL_CURRENT | PendingIntent.FLAG_MUTABLE);
